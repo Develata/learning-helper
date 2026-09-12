@@ -1,0 +1,29 @@
+name: learning-helper
+services:
+  learning-helper:
+    image: learning-helper:0.1.0
+    platform: linux/amd64
+    build:
+      context: .
+    init: true
+    ports:
+      - "127.0.0.1:3000:3001"
+    volumes:
+      - learning-data:/data
+    restart: unless-stopped
+    stop_grace_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "/opt/learning-helper/health.mjs"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  learning-data:

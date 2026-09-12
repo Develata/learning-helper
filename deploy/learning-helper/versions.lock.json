@@ -1,0 +1,12 @@
+{
+  "harnessUpstreamSha": "c291e7961a515f6d7af9304e7fd1d257929aef26",
+  "harnessForkSha": "e56ee57feb140241be6ce9ac9559e83854f7e6ac",
+  "learningHelperPluginSha": "7d44fa3a9228720432cb2997208178adcda03a1d",
+  "harnessVersion": "0.1.5-rc.2",
+  "nodeVersion": "24.18.0",
+  "pnpmVersion": "11.7.0",
+  "buildImage": "node:24.18.0-bookworm@sha256:5711a0d445a1af54af9589066c646df387d1831a608226f4cd694fc59e745059",
+  "runtimeImage": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
+  "platform": "linux/amd64",
+  "harnessForkShaMeaning": "Exact Harness build-input commit; deployment metadata commits are outside the runtime source identity."
+}

@@ -1,0 +1,5 @@
+*
+!Dockerfile
+!versions.lock.json
+!scripts/
+!scripts/*.mjs
