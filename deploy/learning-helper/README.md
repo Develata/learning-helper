@@ -2,20 +2,20 @@
 
 English | [中文](README.zh.md)
 
-This directory owns distribution. Learning behavior and product authority live in the [plugin docs](https://github.com/Develata/dsh-learning-helper/tree/feat/workspace-v02/docs). Requirements: Docker Engine 28+ / Docker Desktop, Compose, and about 8 GiB of available build memory. The target is linux/amd64; the plugin CURRENT records actual acceptance results.
+This directory owns distribution. Learning behavior and product authority live in the [plugin docs](https://github.com/Develata/dsh-learning-helper/tree/main/docs). Requirements: Docker Engine 28+ / Docker Desktop, Compose, and about 8 GiB of available build memory. The target is linux/amd64; the plugin CURRENT records actual acceptance results.
 
-Published images are available from the matching [GitHub Release](https://github.com/Develata/learning-helper/releases/tag/v0.2.1). The attached Compose pins the tested image digest. No local Node/pnpm or source build is needed:
+Published images are available from the matching [GitHub Release](https://github.com/Develata/learning-helper/releases/tag/v0.2.2). The attached Compose pins the tested image digest. No local Node/pnpm or source build is needed:
 
 ```bash
 mkdir learning-helper-deploy
 cd learning-helper-deploy
-curl -fL https://github.com/Develata/learning-helper/releases/download/v0.2.1/compose.yml -o compose.yml
+curl -fL https://github.com/Develata/learning-helper/releases/download/v0.2.2/compose.yml -o compose.yml
 docker compose pull
 docker compose up -d
 docker compose exec learning-helper node /opt/learning-helper/open.mjs
 ```
 
-The versioned image can also be pulled with `docker pull ghcr.io/develata/learning-helper:0.2.1`. First-time GHCR packages default to private: the package administrator must set visibility to Public for anonymous pulls, or use authenticated pulls. See the [release operations](https://github.com/Develata/dsh-learning-helper/blob/feat/workspace-v02/docs/operations/release.md).
+The versioned image can also be pulled with `docker pull ghcr.io/develata/learning-helper:0.2.2`. First-time GHCR packages default to private: the package administrator must set visibility to Public for anonymous pulls, or use authenticated pulls. See the [release operations](https://github.com/Develata/dsh-learning-helper/blob/main/docs/operations/release.md).
 
 The last command prints the official temporary Harness login URL. Opening it exchanges the token for an HttpOnly cookie. Do not capture, share, or persist the token; container logs redact it. Configure a provider in Harness model settings. Without credentials, Workspace learning initialization, uploads, and state views work, but the Agent cannot generate learning content.
 
@@ -33,7 +33,7 @@ Compose uses this one setting for both its loopback port mapping and the contain
 For source builds, clone the matching tag and use the original build-enabled compose.yml:
 
 ```bash
-git clone --branch v0.2.1 https://github.com/Develata/learning-helper.git
+git clone --branch v0.2.2 https://github.com/Develata/learning-helper.git
 cd learning-helper/deploy/learning-helper
 docker compose up --build -d
 ```
@@ -60,7 +60,7 @@ docker compose restart
 docker compose stop
 ```
 
-Stop/restart preserve the volume. Do not use `down --volumes` for everyday data. See [DEMO](https://github.com/Develata/dsh-learning-helper/blob/feat/workspace-v02/docs/DEMO.md) for an isolated demonstration reset.
+Stop/restart preserve the volume. Do not use `down --volumes` for everyday data. See [DEMO](https://github.com/Develata/dsh-learning-helper/blob/main/docs/DEMO.md) for an isolated demonstration reset.
 
 ## Final acceptance
 
@@ -77,7 +77,7 @@ Choose another `LEARNING_HELPER_PORT` if the port is occupied. A conflicting vol
 
 One Harness Workspace is one Learning Project. Select a local directory under `/data/workspace` (for example `/data/workspace/analysis`). Its learning-assets and .learning-helper directory, including state.db, evidence.db and immutable PDF archive, are all on the persistent volume. Directories elsewhere in the image are ephemeral; use a deliberate persistent bind mount if needed. Use one Host per Workspace and local disk; shared network filesystems are unsupported.
 
-Upgrading does not load or overwrite v0.1 global courses. Stop v0.1 and back up the full volume first, then run the plugin's explicit [v1 migration](https://github.com/Develata/dsh-learning-helper/blob/feat/workspace-v02/docs/operations/migration-v1.md) from an offline volume copy. Validate each migrated course in its own Workspace before switching the normal deployment. Keep the original volume and v0.1 image for rollback; never migrate automatically at startup. Rolling back means using that untouched old volume, not opening v0.2 databases with v0.1.
+Upgrading does not load or overwrite v0.1 global courses. Stop v0.1 and back up the full volume first, then run the plugin's explicit [v1 migration](https://github.com/Develata/dsh-learning-helper/blob/main/docs/operations/migration-v1.md) from an offline volume copy. Validate each migrated course in its own Workspace before switching the normal deployment. Keep the original volume and v0.1 image for rollback; never migrate automatically at startup. Rolling back means using that untouched old volume, not opening v0.2 databases with v0.1.
 
 PDF.js runs locally in the plugin. Vision modes require an image-capable active Harness model and retain local evidence on failure. MinerU is optional external official protocol 2 service; no Python/OCR models are added to this image. Configure its trusted base URL in the Workspace UI. If needed, inject LEARNING_HELPER_MINERU_TOKEN through a private runtime Compose override, never build ARG/COPY or committed .env. No configured MinerU service is required for local PDF use.
 

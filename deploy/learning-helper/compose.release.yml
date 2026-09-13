@@ -1,7 +1,7 @@
 name: learning-helper
 services:
   learning-helper:
-    image: ${LEARNING_HELPER_IMAGE:-ghcr.io/develata/learning-helper:0.2.1}
+    image: ${LEARNING_HELPER_IMAGE:-ghcr.io/develata/learning-helper:0.2.2}
     platform: linux/amd64
     init: true
     ports:
