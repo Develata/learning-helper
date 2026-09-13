@@ -1,9 +1,11 @@
 # Upstream patches
 
-当前 Harness runtime patches：**0**。`packages/` 与 `apps/` 相对 [固定基线](UPSTREAM_BASE.md) 没有变更。
+当前 Harness runtime patches：**0**。`packages/` 与 `apps/` 相对 [固定基线](UPSTREAM_BASE.md) 无变更。
 
-P5 仅增加 `deploy/learning-helper/` 的固定版本 Docker/profile、保留 HTTP 字节与认证语义的 TCP bridge、health/冷启动验收和部署文档，并更新三份根发行说明。Docker build 使用公开 package manifest 的 workspace peer closure；构建阶段的配置组合不修改 Harness implementation。
+v0.2只调整发行层：固定Workspace插件版本、按实际版本安装预构建tgz、Workspace持久化与显式v1迁移说明、独立Docker/Chromium/重启验收。构建获取exact SHA，保留外部依赖版本与integrity；profile通过公开package manifest补齐required peers，不修改Harness implementation。
 
-`.codegraph/` 仍由本地 `.git/info/exclude` 忽略；没有修改 upstream `.gitignore`，没有 submodule。学习逻辑、UI 与 grounding 全在独立插件。
+容器内Harness保持loopback监听；TCP bridge保留Host/Origin/cookie/WebSocket语义，宿主默认127.0.0.1:3010。没有trust-all或auth bypass，runtime不安装/clone/update。
 
-未来 core patch 必须先证明 bundle、profile patch、Host plugin、dsh.client 与 UI slot 均不足，再记录位置、理由、upstream SHA 与维护方式。v0.1 当前不需要任何 core patch。
+`.codegraph/`由本地`.git/info/exclude`忽略；不修改upstream `.gitignore`，不使用submodule。学习业务、Workspace解析、PDF/vision/MinerU、UI与grounding全部位于独立插件。已有独立branding worktree未合入本分支。
+
+未来core patch仍须先证明bundle/profile/Host/client/slot的公开扩展点不足，并记录位置、理由、upstream SHA和维护方式。
