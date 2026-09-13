@@ -2,6 +2,8 @@
 
 当前 Harness runtime patches：**0**。`packages/` 与 `apps/` 相对 [固定基线](UPSTREAM_BASE.md) 无变更。
 
+本批次仅同步已推送插件的exact SHA及发行说明；不修改Harness实现，不运行容器部署。新pin与旧镜像验收的区别由 [UPSTREAM_BASE](UPSTREAM_BASE.md) 说明。
+
 v0.2只调整发行层：固定Workspace插件版本、按实际版本安装预构建tgz、Workspace持久化与显式v1迁移说明、独立Docker/Chromium/重启验收。构建获取exact SHA，保留外部依赖版本与integrity；profile通过公开package manifest补齐required peers，不修改Harness implementation。
 
 容器内Harness保持loopback监听；TCP bridge保留Host/Origin/cookie/WebSocket语义，宿主默认127.0.0.1:3010。没有trust-all或auth bypass，runtime不安装/clone/update。
