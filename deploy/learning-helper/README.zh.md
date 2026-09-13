@@ -13,6 +13,15 @@ docker compose exec learning-helper node /opt/learning-helper/open.mjs
 
 最后一条输出 Harness 官方临时登录 URL，打开后换取 HttpOnly cookie。不要截图、分享或持久保存 token；容器日志将它隐去。首次进入在 Harness 模型设置配置 provider。无凭证时仍可创建课程、上传资料和查看状态，但 Agent 不生成新学习内容。
 
+默认浏览器地址为 **[127.0.0.1:3010](http://127.0.0.1:3010)**。需要其他空闲宿主端口时，在本目录已忽略的 `.env` 文件设置 `LEARNING_HELPER_PORT`，或创建容器时传入：
+
+```bash
+LEARNING_HELPER_PORT=3011 docker compose up --build -d
+docker compose exec learning-helper node /opt/learning-helper/open.mjs
+```
+
+Compose 用同一个配置生成 loopback 端口映射和容器环境变量。`open.mjs` 读取运行中容器的配置，只替换官方登录 URL 的端口，保留 token，无需 Docker socket。端口必须是 1–65535 的十进制整数，不支持自动分配端口 0。请通过此配置调整端口，不要独立手改 `ports`；自定义 Compose override 或 `docker run` 时也必须使映射与 `LEARNING_HELPER_PORT` 一致。脚本或端口变更通过 `up --build -d` 生效，单独 `restart` 不会更换镜像或映射。已有 volume 保留；切换 origin 后可能需要重新登录或从会话列表打开学习会话，浏览器书签不会跨 origin 迁移。
+
 ## 构建与运行
 
 [versions.lock.json](versions.lock.json) 是构建输入 authority：Node/pnpm、两仓 SHA、upstream baseline、基础镜像 digest。`harnessForkSha` 指获取 Harness 源码的已发布输入提交，不是包含这个 JSON 的元数据提交，避免自引用 SHA；发行 HEAD 由 Git 追踪。插件 SHA 固定到已经推送的验收提交。
@@ -23,7 +32,7 @@ Docker build 获取 exact SHA，使用 frozen lockfile；构建 Harness 后以�
 
 ## 网络与状态
 
-Harness 只监听容器内 127.0.0.1:3000。TCP bridge 监听容器 3001；Compose 仅发布 **127.0.0.1:3000 → 3001**。桥接不改写 Host/Origin/cookie/WebSocket，Harness 仍检查信任与认证。没有 trust-all、auth bypass 或写死 token。参考 [Docker localhost port publishing](https://docs.docker.com/engine/network/port-publishing/)；低于 28 的旧 Docker 不在此部署支持范围内。
+Harness 只监听容器内 127.0.0.1:3000。TCP bridge 监听容器 3001；Compose 默认发布 **127.0.0.1:3010 → 3001**。桥接不改写 Host/Origin/cookie/WebSocket，Harness 仍检查信任与认证。没有 trust-all、auth bypass 或写死 token。参考 [Docker localhost port publishing](https://docs.docker.com/engine/network/port-publishing/)；低于 28 的旧 Docker 不在此部署支持范围内。
 
 `learning-data` volume 挂载 DSH_HOME=/data，保存学习 DB、Evidence DB、会话、设置与运行时凭证；uid/gid 1000 的 node 用户拥有新 volume。已有 bind mount 由操作者准备权限，程序不递归 chown 用户目录。不要将 .env 或 key COPY/ARG 进入镜像。
 
@@ -41,10 +50,10 @@ stop/restart 保留 volume；不要用 `down --volumes` 处理日常数据。独
 ## 最终验收
 
 ```bash
-node --test scripts/bridge.test.mjs
+node --test scripts/bridge.test.mjs scripts/open.test.mjs
 node scripts/acceptance.mjs /absolute/path/to/dsh-learning-helper
 ```
 
 验收执行 build --no-cache，使用唯一 project/new volume，挂载仅测试用 observer（正常 image/profile 没有）；真实 Chromium 创建/上传/练习/Weak/v2/刷新，容器重启后核对学习和 Source。结束只移除本次 fixture project/volume。浏览器复用固定 Harness checkout 的 Playwright；sanitized 回执在插件 artifacts/docker-result.json。排障可设置 `LH_DOCKER_USE_CACHE=1` 复用构建层，回执会明确记录；最终验收不设置该变量，必须 no-cache。
 
-端口占用时先停止其他演示 project；volume profile 路径冲突时明确退出，不覆盖用户文件。远程公网、额外 auth、多用户不属于 v0.1。
+端口占用时选择其他 `LEARNING_HELPER_PORT`；volume profile 路径冲突时明确退出，不覆盖用户文件。远程公网、额外 auth、多用户不属于 v0.1。

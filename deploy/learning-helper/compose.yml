@@ -7,7 +7,9 @@ services:
       context: .
     init: true
     ports:
-      - "127.0.0.1:3000:3001"
+      - "127.0.0.1:${LEARNING_HELPER_PORT:-3010}:3001"
+    environment:
+      LEARNING_HELPER_PORT: "${LEARNING_HELPER_PORT:-3010}"
     volumes:
       - learning-data:/data
     restart: unless-stopped
