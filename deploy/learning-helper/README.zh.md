@@ -4,18 +4,18 @@
 
 这是发行层；学习业务与产品 authority 在 [插件 docs](https://github.com/Develata/dsh-learning-helper/tree/feat/workspace-v02/docs)。需要 Docker Engine 28+ / Docker Desktop、Compose、约 8 GiB 可用构建内存。目标平台 linux/amd64，实际验收状态见插件 CURRENT。
 
-发布镜像见同版本 [GitHub Release](https://github.com/Develata/learning-helper/releases/tag/v0.2.0)。附带的 Compose 固定实测镜像 digest，无需本地 Node/pnpm 或源码构建：
+发布镜像见同版本 [GitHub Release](https://github.com/Develata/learning-helper/releases/tag/v0.2.1)。附带的 Compose 固定实测镜像 digest，无需本地 Node/pnpm 或源码构建：
 
 ```bash
 mkdir learning-helper-deploy
 cd learning-helper-deploy
-curl -fL https://github.com/Develata/learning-helper/releases/download/v0.2.0/compose.yml -o compose.yml
+curl -fL https://github.com/Develata/learning-helper/releases/download/v0.2.1/compose.yml -o compose.yml
 docker compose pull
 docker compose up -d
 docker compose exec learning-helper node /opt/learning-helper/open.mjs
 ```
 
-也可直接执行 `docker pull ghcr.io/develata/learning-helper:0.2.0`。首次 GHCR 包默认私有：包管理员需改为 Public 才可匿名拉取，否则使用已登录凭据。详见 [发布操作](https://github.com/Develata/dsh-learning-helper/blob/feat/workspace-v02/docs/operations/release.md)。
+也可直接执行 `docker pull ghcr.io/develata/learning-helper:0.2.1`。首次 GHCR 包默认私有：包管理员需改为 Public 才可匿名拉取，否则使用已登录凭据。详见 [发布操作](https://github.com/Develata/dsh-learning-helper/blob/feat/workspace-v02/docs/operations/release.md)。
 
 最后一条输出 Harness 官方临时登录 URL，打开后换取 HttpOnly cookie。不要截图、分享或持久保存 token；容器日志将它隐去。首次进入在 Harness 模型设置配置 provider。无凭证时仍可初始化 Workspace 学习项目、上传资料和查看状态，但 Agent 不生成新学习内容。
 
@@ -33,7 +33,7 @@ Compose 用同一个配置生成 loopback 端口映射和容器环境变量。`o
 需要源码构建时，克隆同版本 tag，使用原有带 build 的 compose.yml：
 
 ```bash
-git clone --branch v0.2.0 https://github.com/Develata/learning-helper.git
+git clone --branch v0.2.1 https://github.com/Develata/learning-helper.git
 cd learning-helper/deploy/learning-helper
 docker compose up --build -d
 ```

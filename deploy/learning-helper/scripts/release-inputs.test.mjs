@@ -19,8 +19,9 @@ test('downloadable Compose pins one immutable image without changing runtime sec
   const compose = await readFile(new URL('../compose.release.yml', import.meta.url), 'utf8');
   const digest = 'ghcr.io/develata/learning-helper@sha256:' + 'a'.repeat(64);
   const pinned = pinCompose(compose, digest);
-  assert.ok(pinned.includes(digest));
-  assert.equal(pinned.replace(digest, '${LEARNING_HELPER_IMAGE:-ghcr.io/develata/learning-helper:0.2.0}'), compose);
+  assert.deepEqual(pinned.split('\n').filter(line => /^    image:/.test(line)), [`    image: ${digest}`]);
+  const runtimeLines = text => text.split('\n').filter(line => !/^    image:/.test(line));
+  assert.deepEqual(runtimeLines(pinned), runtimeLines(compose));
   assert.doesNotMatch(pinned, /^\s+build:/m);
   for (const value of ['ghcr.io/develata/learning-helper:latest', digest + '\n', 'attacker/image@sha256:' + 'a'.repeat(64)]) assert.throws(() => pinCompose(compose, value));
   assert.throws(() => pinCompose(compose + compose, digest));

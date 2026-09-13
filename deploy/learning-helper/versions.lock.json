@@ -1,7 +1,7 @@
 {
   "harnessUpstreamSha": "c291e7961a515f6d7af9304e7fd1d257929aef26",
   "harnessForkSha": "e56ee57feb140241be6ce9ac9559e83854f7e6ac",
-  "learningHelperPluginSha": "68ba236dc46a7d77f14034b8a638765263ab1010",
+  "learningHelperPluginSha": "b63399cae9a647667baa36b44bfb3ad9ead39f84",
   "harnessVersion": "0.1.5-rc.2",
   "nodeVersion": "24.18.0",
   "pnpmVersion": "11.7.0",
