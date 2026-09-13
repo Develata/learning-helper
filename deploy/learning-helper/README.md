@@ -4,25 +4,40 @@ English | [中文](README.zh.md)
 
 This directory owns distribution. Learning behavior and product authority live in the [plugin docs](https://github.com/Develata/dsh-learning-helper/tree/feat/workspace-v02/docs). Requirements: Docker Engine 28+ / Docker Desktop, Compose, and about 8 GiB of available build memory. The target is linux/amd64; the plugin CURRENT records actual acceptance results.
 
+Published images are available from the matching [GitHub Release](https://github.com/Develata/learning-helper/releases/tag/v0.2.0). The attached Compose pins the tested image digest. No local Node/pnpm or source build is needed:
+
 ```bash
-git clone --branch feat/workspace-v02 https://github.com/Develata/learning-helper.git
-cd learning-helper/deploy/learning-helper
-docker compose up --build -d
+mkdir learning-helper-deploy
+cd learning-helper-deploy
+curl -fL https://github.com/Develata/learning-helper/releases/download/v0.2.0/compose.yml -o compose.yml
+docker compose pull
+docker compose up -d
 docker compose exec learning-helper node /opt/learning-helper/open.mjs
 ```
+
+The versioned image can also be pulled with `docker pull ghcr.io/develata/learning-helper:0.2.0`. First-time GHCR packages default to private: the package administrator must set visibility to Public for anonymous pulls, or use authenticated pulls. See the [release operations](https://github.com/Develata/dsh-learning-helper/blob/feat/workspace-v02/docs/operations/release.md).
 
 The last command prints the official temporary Harness login URL. Opening it exchanges the token for an HttpOnly cookie. Do not capture, share, or persist the token; container logs redact it. Configure a provider in Harness model settings. Without credentials, Workspace learning initialization, uploads, and state views work, but the Agent cannot generate learning content.
 
 The default browser address is **[127.0.0.1:3010](http://127.0.0.1:3010)**. To use another available host port, set `LEARNING_HELPER_PORT` in this directory's ignored `.env` file, or pass it when creating the container:
 
 ```bash
-LEARNING_HELPER_PORT=3011 docker compose up --build -d
+LEARNING_HELPER_PORT=3011 docker compose up -d
 docker compose exec learning-helper node /opt/learning-helper/open.mjs
 ```
 
-Compose uses this one setting for both its loopback port mapping and the container environment. `open.mjs` reads the running container's setting and changes only the port in the official login URL; it preserves the token and needs no Docker socket. Use a decimal port from 1 to 65535; automatic port 0 is unsupported. Configure ports through this setting, rather than editing `ports` independently. With a custom Compose override or `docker run`, keep the mapping and `LEARNING_HELPER_PORT` identical. Apply script or port changes with `up --build -d`; `restart` alone does not replace the image or mapping. Existing volumes remain, but browser cookies and task bookmarks may require login or reopening sessions after changing the origin.
+Compose uses this one setting for both its loopback port mapping and the container environment. `open.mjs` reads the running container's setting and changes only the port in the official login URL; it preserves the token and needs no Docker socket. Use a decimal port from 1 to 65535; automatic port 0 is unsupported. Configure ports through this setting, rather than editing `ports` independently. With a custom Compose override or `docker run`, keep the mapping and `LEARNING_HELPER_PORT` identical. Apply image updates with `pull` then `up -d`, and port changes with `up -d`; `restart` alone does not replace the image or mapping. Existing volumes remain, but browser cookies and task bookmarks may require login or reopening sessions after changing the origin.
 
 ## Build and runtime
+
+For source builds, clone the matching tag and use the original build-enabled compose.yml:
+
+```bash
+git clone --branch v0.2.0 https://github.com/Develata/learning-helper.git
+cd learning-helper/deploy/learning-helper
+docker compose up --build -d
+```
+
 
 [versions.lock.json](versions.lock.json) owns build inputs: Node/pnpm, both repository SHAs, the upstream baseline, and base-image digests. `harnessForkSha` identifies the published Harness source input, not the metadata commit containing this JSON; Git tracks the release HEAD without a self-referential hash. The plugin SHA pins a pushed source commit; [UPSTREAM_BASE](../../UPSTREAM_BASE.md) distinguishes packed-plugin verification from Docker image acceptance.
 
