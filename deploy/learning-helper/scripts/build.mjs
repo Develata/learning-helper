@@ -12,8 +12,9 @@ function run(command, args, cwd, timeout = 600_000, extraEnv = {}) {
 function checkout(repo, sha, destination) {
   assert.match(sha, /^[a-f0-9]{40}$/); mkdirSync(destination);
   run('git', ['init', '-q'], destination);
+  run('git', ['config', 'http.version', 'HTTP/1.1'], destination);
   run('git', ['remote', 'add', 'origin', `https://github.com/Develata/${repo}.git`], destination);
-  run('git', ['fetch', '--depth=1', 'origin', sha], destination, 120_000);
+  run('git', ['fetch', '--progress', '--depth=1', 'origin', sha, ...(repo === 'learning-helper' ? [lock.harnessUpstreamSha] : [])], destination, 600_000);
   run('git', ['checkout', '--detach', sha], destination);
 }
 assert.equal(process.versions.node, lock.nodeVersion);
@@ -21,7 +22,6 @@ assert.equal(spawnSync('pnpm', ['--version'], { encoding: 'utf8' }).stdout.trim(
 checkout('learning-helper', lock.harnessForkSha, '/build/harness');
 checkout('dsh-learning-helper', lock.learningHelperPluginSha, '/build/plugin');
 assert.equal(JSON.parse(readFileSync('/build/harness/apps/cli/package.json')).version, lock.harnessVersion);
-run('git', ['fetch', '--depth=1', 'origin', lock.harnessUpstreamSha], '/build/harness', 120_000);
 const changes = spawnSync('git', ['diff', '--name-only', lock.harnessUpstreamSha, 'HEAD', '--', 'packages', 'apps'], { cwd: '/build/harness', encoding: 'utf8' });
 assert.equal(changes.status, 0); assert.equal(changes.stdout, '', 'Harness runtime patch gate');
 run('pnpm', ['install', '--frozen-lockfile'], '/build/harness');
@@ -71,6 +71,6 @@ run('node', [cli, '--profile', 'learning-helper', '--from-default-profile', 'web
 const manifest = '/opt/runtime/home/profiles/learning-helper/package.json';
 const profile = JSON.parse(readFileSync(manifest)); profile.packageManager = `pnpm@${lock.pnpmVersion}`;
 writeFileSync(manifest, JSON.stringify(profile, null, 2) + '\n');
-run('node', [cli, 'plugin', '--profile', 'learning-helper', 'add', '/opt/runtime/packages/dsh-learning-helper-0.1.0.tgz', '--ignore-scripts'], '/opt/runtime', 120_000, env);
+run('node', [cli, 'plugin', '--profile', 'learning-helper', 'add', `/opt/runtime/packages/dsh-learning-helper-${JSON.parse(readFileSync('/build/plugin/package.json')).version}.tgz`, '--ignore-scripts'], '/opt/runtime', 120_000, env);
 // dsh owns and heals the official module fallback into the pinned runtime closure.
 run('node', [cli, '--profile', 'learning-helper', '--dump-config'], '/opt/runtime', 120_000, env);

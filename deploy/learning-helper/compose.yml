@@ -1,10 +1,13 @@
 name: learning-helper
 services:
   learning-helper:
-    image: learning-helper:0.1.0
+    image: learning-helper:0.2.0-dev
     platform: linux/amd64
     build:
       context: .
+      args:
+        HTTP_PROXY: "${LEARNING_HELPER_BUILD_PROXY:-}"
+        HTTPS_PROXY: "${LEARNING_HELPER_BUILD_PROXY:-}"
     init: true
     ports:
       - "127.0.0.1:${LEARNING_HELPER_PORT:-3010}:3001"

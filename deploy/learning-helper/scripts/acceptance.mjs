@@ -29,7 +29,7 @@ async function run(extra, timeout = 120_000) {
 }
 let created = false;
 try {
-  await writeFile(join(work, 'probe.patch.yml'), `- id: learning-helper\n  config:\n    demo: true\n    evidencePath: !!js dshHomePath('learning-helper', 'evidence.db')\n- insert:\n    - id: learning-helper-test-probe\n      name: /opt/runtime/acceptance/tool-probe.mjs\n`);
+  await writeFile(join(work, 'probe.patch.yml'), `- insert:\n    - id: learning-helper-test-probe\n      name: /opt/runtime/acceptance/tool-probe.mjs\n      config:\n        workspace: /data/acceptance\n`);
   await writeFile(join(work, 'acceptance.yml'), `services:\n  learning-helper:\n    image: ${project}:test\n    command: ["--patch", "/opt/runtime/acceptance/probe.patch.yml"]\n    volumes:\n      - ${JSON.stringify(join(plugin, 'scripts/tool-probe.mjs') + ':/opt/runtime/acceptance/tool-probe.mjs:ro')}\n      - ${JSON.stringify(join(work, 'probe.patch.yml') + ':/opt/runtime/acceptance/probe.patch.yml:ro')}\n`);
   record.noCache = process.env.LH_DOCKER_USE_CACHE !== '1';
   console.log(`Docker acceptance: building pinned sources (${record.noCache ? 'no cache' : 'cached diagnostic'})`);
@@ -47,16 +47,16 @@ try {
     return { base, cookie, get, post };
   }
   const web = await connect();
-  await browserSmoke({ web, harness, plugin, work, workspacePath: '/data/workspace', screenshotsPath: join(plugin, 'artifacts/docker-browser') });
+  await run(['exec', '-T', 'learning-helper', 'mkdir', '-p', '/data/other-workspace']);
+  const fixture = await browserSmoke({ web, harness, plugin, work, workspacePath: '/data/workspace', otherWorkspacePath: '/data/other-workspace', screenshotsPath: join(plugin, 'artifacts/docker-browser') });
   record.browser = 'PASS';
-  const courses = await (await web.get('/learning-helper/v1/courses')).json();
-  const course = courses.courses.find(c => c.title === '数学分析 · 三天复习'); assert.ok(course);
-  const before = await (await web.get(`/learning-helper/v1/courses/${course.id}/dashboard`)).json();
-  const sources = await (await web.get(`/learning-helper/v1/courses/${course.id}/sources`)).json();
+  const scope = `/learning-helper/v2/sessions/${fixture.sessionId}`;
+  const before = await (await web.get(`${scope}/dashboard`)).json();
+  const sources = await (await web.get(`${scope}/sources`)).json();
   await run(['restart']); await delay(1000); await run(['up', '-d', '--wait', '--wait-timeout', '120']);
   const restarted = await connect();
-  assert.deepEqual(await (await restarted.get(`/learning-helper/v1/courses/${course.id}/dashboard`)).json(), before);
-  assert.deepEqual(await (await restarted.get(`/learning-helper/v1/courses/${course.id}/sources`)).json(), sources);
+  assert.deepEqual(await (await restarted.get(`${scope}/dashboard`)).json(), before);
+  assert.deepEqual(await (await restarted.get(`${scope}/sources`)).json(), sources);
   record.restartPersistence = 'PASS'; record.authAndOrigin = 'PASS'; record.status = 'passed';
   record.image = (await run(['images', '-q'])).trim();
 } catch (error) {
