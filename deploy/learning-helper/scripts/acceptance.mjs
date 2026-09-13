@@ -12,12 +12,14 @@ const harness = resolve(deployment, '../..');
 const plugin = resolve(process.argv[2] ?? join(harness, '../dsh-learning-helper'));
 const { browserSmoke } = await import(pathToFileURL(join(plugin, 'scripts/browser-smoke.mjs')));
 const work = await mkdtemp(join(tmpdir(), 'learning-helper-docker-'));
-const project = 'lh-acceptance-' + Date.now();
+const project = 'lh-acceptance-' + work.split('/').at(-1).toLowerCase();
 const record = { startedAt: new Date().toISOString(), status: 'running', project, versions: JSON.parse(await readFile(join(deployment, 'versions.lock.json'), 'utf8')) };
 const artifact = join(plugin, 'artifacts/docker-result.json');
 await mkdir(join(plugin, 'artifacts'), { recursive: true });
 const docker = process.env.DOCKER_BIN ?? 'docker';
-const args = ['compose', '-p', project, '-f', join(deployment, 'compose.yml'), '-f', join(work, 'acceptance.yml')];
+const existingImage = process.env.LH_DOCKER_TEST_IMAGE;
+if (existingImage) assert.match(existingImage, /^(?:sha256:[a-f0-9]{64}|[a-z0-9][a-z0-9./:_-]{0,200})$/);
+const args = ['compose', '-p', project, '-f', join(deployment, existingImage ? 'compose.release.yml' : 'compose.yml'), '-f', join(work, 'acceptance.yml')];
 const scrub = s => s.replace(/([?&]token=)[^\s"'<>]+/g, '$1[REDACTED]');
 async function run(extra, timeout = 120_000) {
   const child = spawn(docker, [...args, ...extra], { cwd: deployment, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -30,10 +32,13 @@ async function run(extra, timeout = 120_000) {
 let created = false;
 try {
   await writeFile(join(work, 'probe.patch.yml'), `- insert:\n    - id: learning-helper-test-probe\n      name: /opt/runtime/acceptance/tool-probe.mjs\n      config:\n        workspace: /data/acceptance\n`);
-  await writeFile(join(work, 'acceptance.yml'), `services:\n  learning-helper:\n    image: ${project}:test\n    command: ["--patch", "/opt/runtime/acceptance/probe.patch.yml"]\n    volumes:\n      - ${JSON.stringify(join(plugin, 'scripts/tool-probe.mjs') + ':/opt/runtime/acceptance/tool-probe.mjs:ro')}\n      - ${JSON.stringify(join(work, 'probe.patch.yml') + ':/opt/runtime/acceptance/probe.patch.yml:ro')}\n`);
-  record.noCache = process.env.LH_DOCKER_USE_CACHE !== '1';
-  console.log(`Docker acceptance: building pinned sources (${record.noCache ? 'no cache' : 'cached diagnostic'})`);
-  await run(['build', ...(record.noCache ? ['--no-cache'] : [])], 3_600_000); record.build = 'PASS';
+  await writeFile(join(work, 'acceptance.yml'), `services:\n  learning-helper:\n    image: ${existingImage ?? project + ':test'}\n    pull_policy: never\n    command: ["--patch", "/opt/runtime/acceptance/probe.patch.yml"]\n    volumes:\n      - ${JSON.stringify(join(plugin, 'scripts/tool-probe.mjs') + ':/opt/runtime/acceptance/tool-probe.mjs:ro')}\n      - ${JSON.stringify(join(work, 'probe.patch.yml') + ':/opt/runtime/acceptance/probe.patch.yml:ro')}\n`);
+  record.noCache = !existingImage && process.env.LH_DOCKER_USE_CACHE !== '1';
+  if (existingImage) { record.build = 'EXTERNAL'; record.testedImage = existingImage; }
+  else {
+    console.log(`Docker acceptance: building pinned sources (${record.noCache ? 'no cache' : 'cached diagnostic'})`);
+    await run(['build', ...(record.noCache ? ['--no-cache'] : [])], 3_600_000); record.build = 'PASS';
+  }
   created = true; await run(['up', '-d', '--wait', '--wait-timeout', '120']); record.coldBoot = 'PASS';
   async function connect() {
     const url = (await run(['exec', '-T', 'learning-helper', 'node', '/opt/learning-helper/open.mjs'])).trim();
@@ -48,7 +53,7 @@ try {
   }
   const web = await connect();
   await run(['exec', '-T', 'learning-helper', 'mkdir', '-p', '/data/other-workspace']);
-  const fixture = await browserSmoke({ web, harness, plugin, work, workspacePath: '/data/workspace', otherWorkspacePath: '/data/other-workspace', screenshotsPath: join(plugin, 'artifacts/docker-browser') });
+  const fixture = await browserSmoke({ web, harness: process.env.LH_BROWSER_RUNTIME ?? harness, plugin, work, workspacePath: '/data/workspace', otherWorkspacePath: '/data/other-workspace', screenshotsPath: join(plugin, 'artifacts/docker-browser') });
   record.browser = 'PASS';
   const scope = `/learning-helper/v2/sessions/${fixture.sessionId}`;
   const before = await (await web.get(`${scope}/dashboard`)).json();

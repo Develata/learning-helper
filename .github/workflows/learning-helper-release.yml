@@ -1,0 +1,228 @@
+name: Release Learning Helper image
+
+on:
+  push:
+    tags: ['v[0-9]*']
+
+permissions:
+  contents: read
+
+concurrency:
+  # Different versions build concurrently; a rerun never cancels an active publication.
+  group: learning-image-release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      plugin: ${{ steps.inputs.outputs.plugin }}
+      version: ${{ steps.inputs.outputs.version }}
+      node: ${{ steps.inputs.outputs.node }}
+      pnpm: ${{ steps.inputs.outputs.pnpm }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.18.0'
+          package-manager-cache: false
+      - name: Verify immutable inputs and published plugin tag
+        id: inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node deploy/learning-helper/scripts/release-inputs.mjs "$RELEASE_TAG"
+
+  # Fast policy/package checks and the expensive image + browser lane overlap.
+  checks:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ needs.inputs.outputs.node }}
+          package-manager-cache: false
+      - run: node --test deploy/learning-helper/scripts/*.test.mjs
+      - name: Verify the published plugin package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.inputs.outputs.version }}
+        run: |
+          mkdir package-check
+          cd package-check
+          gh release download "$RELEASE_TAG" --repo Develata/dsh-learning-helper --pattern '*.tgz' --pattern SHA256SUMS
+          sha256sum --check SHA256SUMS
+          tar -xzf "dsh-learning-helper-$VERSION.tgz"
+          test -s package/dist/index.js
+          test -s package/dist/client.js
+          test -s package/cordis.patch.yml
+      - name: Validate pull-only deployment
+        run: |
+          docker compose -f deploy/learning-helper/compose.release.yml config --quiet
+          git diff --check
+
+  image:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Develata/dsh-learning-helper
+          ref: ${{ needs.inputs.outputs.plugin }}
+          path: plugin
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ needs.inputs.outputs.node }}
+          package-manager-cache: false
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build once; do not publish an untested image
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: deploy/learning-helper
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: learning-helper:ci
+          # The tested Docker image is transferred verbatim to the publish job.
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=learning-helper-amd64
+          cache-to: type=gha,mode=max,scope=learning-helper-amd64
+          labels: |
+            org.opencontainers.image.source=https://github.com/Develata/learning-helper
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.inputs.outputs.version }}
+            org.opencontainers.image.licenses=MIT
+            io.learning-helper.plugin-revision=${{ needs.inputs.outputs.plugin }}
+      - name: Install only the pinned browser test runtime
+        env:
+          LH_BROWSER_RUNTIME: ${{ runner.temp }}/lh-browser
+        run: |
+          mkdir -p "$LH_BROWSER_RUNTIME/apps/web"
+          npm install --prefix "$LH_BROWSER_RUNTIME/apps/web" --ignore-scripts --no-audit --no-fund playwright@1.61.1
+          "$LH_BROWSER_RUNTIME/apps/web/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Cold boot, real Chromium, auth, Workspace and restart persistence
+        env:
+          LH_DOCKER_TEST_IMAGE: learning-helper:ci
+          LH_BROWSER_RUNTIME: ${{ runner.temp }}/lh-browser
+          LEARNING_HELPER_PORT: '3010'
+        run: node deploy/learning-helper/scripts/acceptance.mjs "$GITHUB_WORKSPACE/plugin"
+      - name: Export the tested image and receipt
+        run: |
+          mkdir -p release-image
+          docker image inspect learning-helper:ci --format '{{.Id}}' > release-image/image-id.txt
+          docker save learning-helper:ci | gzip -1 > release-image/image.tar.gz
+          cp plugin/artifacts/docker-result.json release-image/docker-result.json
+          cd release-image
+          sha256sum image.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tested-image
+          path: release-image/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+      - name: Preserve sanitized acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docker-acceptance
+          path: |
+            plugin/artifacts/docker-result.json
+            plugin/artifacts/docker-browser/*.png
+            plugin/artifacts/docker-browser/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    needs: [inputs, checks, image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Refuse to replace an already published release image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json url > /dev/null 2> "$RUNNER_TEMP/release-lookup-error"; then
+            echo 'This release already exists. Publish a new version instead of replacing its image.' >&2
+            exit 1
+          fi
+          if ! grep -Eq 'HTTP 404|release not found' "$RUNNER_TEMP/release-lookup-error"; then
+            cat "$RUNNER_TEMP/release-lookup-error" >&2
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tested-image
+          path: release-image
+      - name: Verify transferred image identity
+        run: |
+          cd release-image
+          sha256sum --check SHA256SUMS
+          docker load --input image.tar.gz
+          test "$(docker image inspect learning-helper:ci --format '{{.Id}}')" = "$(cat image-id.txt)"
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Push exactly the tested image
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+        run: |
+          image="ghcr.io/develata/learning-helper:$VERSION"
+          docker tag learning-helper:ci "$image"
+          docker push "$image"
+          docker pull "$image"
+          test "$(docker image inspect "$image" --format '{{.Id}}')" = "$(cat release-image/image-id.txt)"
+          docker image inspect "$image" --format '{{index .RepoDigests 0}}' > release-image/image-digest.txt
+      - name: Publish deployment assets and digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.inputs.outputs.version }}
+        run: |
+          mkdir release
+          cp deploy/learning-helper/versions.lock.json release/
+          cp release-image/docker-result.json release/
+          cp release-image/image-digest.txt release/
+          # Pin the downloadable Compose to the registry digest, never a floating alias.
+          node deploy/learning-helper/scripts/release-compose.mjs "$(cat release/image-digest.txt)" release/compose.yml
+          cd release
+          sha256sum compose.yml versions.lock.json docker-result.json image-digest.txt > SHA256SUMS
+          # Literal Markdown backticks in release notes; never execute their contents.
+          # shellcheck disable=SC2016
+          printf 'Learning Helper %s\n\nImage: `ghcr.io/develata/learning-helper:%s` (linux/amd64).\n\nPull digest: `%s`.\n\nDownload compose.yml; run `docker compose up -d` then `docker compose exec learning-helper node /opt/learning-helper/open.mjs`.\n\nModel credentials are configured at runtime. See the deployment README for migration and GHCR visibility.\n' "$RELEASE_TAG" "$VERSION" "$(cat image-digest.txt)" > notes.md
+          args=(--verify-tag --title "$RELEASE_TAG" --notes-file notes.md --latest=false)
+          if [[ "$RELEASE_TAG" == *-* ]]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}" compose.yml versions.lock.json docker-result.json image-digest.txt SHA256SUMS
