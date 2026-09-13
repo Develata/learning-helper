@@ -24,7 +24,7 @@ Compose 用同一个配置生成 loopback 端口映射和容器环境变量。`o
 
 ## 构建与运行
 
-[versions.lock.json](versions.lock.json) 是构建输入 authority：Node/pnpm、两仓 SHA、upstream baseline、基础镜像 digest。`harnessForkSha` 指获取 Harness 源码的已发布输入提交，不是包含这个 JSON 的元数据提交，避免自引用 SHA；发行 HEAD 由 Git 追踪。插件 SHA 固定到已经推送的验收提交。
+[versions.lock.json](versions.lock.json) 是构建输入 authority：Node/pnpm、两仓 SHA、upstream baseline、基础镜像 digest。`harnessForkSha` 指获取 Harness 源码的已发布输入提交，不是包含这个 JSON 的元数据提交，避免自引用 SHA；发行 HEAD 由 Git 追踪。插件 SHA 固定到已经推送的源码提交；[UPSTREAM_BASE](../../UPSTREAM_BASE.md) 分别记录插件包验证与 Docker 镜像验收范围。
 
 Docker build 获取 exact SHA，使用 frozen lockfile；构建 Harness 后以其 upstream runtime closure 为基础，按公开 package.json 补齐插件与 Web 所需的 required workspace peers，再用 pnpm deploy 导出生产依赖。构建阶段的 manifest overlay 不改 Harness 实现；只补入 workspace importer 的相对 link 记录，不重新解析外部 semver，并断言全部外部包版本/integrity 与原 lockfile 完全一致。只在 build stage 为同一个已审核的 subprocess-local postinstall 补充绝对路径许可。插件独立 build/pack 后通过正式 `dsh plugin` 安装，peer 复用固定 Harness runtime。runtime 不 install/clone/update，不带 Git history、构建缓存或测试源码。
 
